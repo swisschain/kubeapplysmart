@@ -24,9 +24,9 @@ def get_git_diff_files_list(prev_commit, last_commit, operations_type):
     }
     allowed_extensions = ['.yaml', '.yml']
     if git_diff_filter[operations_type] == 'ALL':
-        git_cmd_diff = "git diff --name-only " + prev_commit + " " + last_commit
+        git_cmd_diff = "git diff --name-only " + prev_commit + "^ " + last_commit
     else:
-        git_cmd_diff = "git diff --diff-filter=" + git_diff_filter[operations_type] + " --name-only " + prev_commit + " " + last_commit
+        git_cmd_diff = "git diff --diff-filter=" + git_diff_filter[operations_type] + " --name-only " + prev_commit + "^ " + last_commit
     if os.getenv('LOG') == 'DEBUG':
         print("git_cmd_diff:", git_cmd_diff)
     cmd_pipe = subprocess.Popen(git_cmd_diff, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -45,5 +45,5 @@ def get_git_diff_files_list(prev_commit, last_commit, operations_type):
         if os.getenv('LOG') == 'DEBUG':
             if found_extension == 0:
                 print('skip file - not fount in allowed_extensions list:', git_response_line.strip())
-    print('files_list:', files_list)
+    print('Files list ' + operations_type + ':', files_list)
     return files_list
