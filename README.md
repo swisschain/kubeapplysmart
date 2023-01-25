@@ -16,7 +16,7 @@ metadata:
   namespace: new-namespace
 spec:
 ```
-1. Specify sequence of group
+2. Specify sequence of group
 
 In pool request comment while creating (you can add ``` before and after list of groups)
 ```
@@ -68,7 +68,7 @@ jobs:
         DRY_RUN: True
 ```
 
-1. Merge pool request (real run)
+2. Merge pool request (real run)
 ```
 name: deploy
 on:
