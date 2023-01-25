@@ -2,6 +2,7 @@
 Apply all changed in commit to kunernetes in a smart way
 
 After creating pool request DRY RUN test will started and after merge reall apply will performed
+## Settings
 1. Set sequence group in kubernetes yaml file, to deploy it in specific order
 
 Deployment file example
@@ -36,9 +37,8 @@ group:new-group2
 group:new-group3
 ```
 
-1. Example pipelines
-
-Start on create or update pool request (try run)
+## Pipelines
+1. Start on create or update pool request (try run)
 ```
 name: check-deploy
 on:
@@ -68,7 +68,7 @@ jobs:
         DRY_RUN: True
 ```
 
-Merge pool request (real run)
+1. Merge pool request (real run)
 ```
 name: deploy
 on:
