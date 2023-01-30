@@ -1,5 +1,5 @@
 # Kubernetes Apply Smart
-Apply all changed in commit to kunernetes in a smart way
+Apply all changes in commit to kunernetes in a smart way
 
 After creating pool request DRY RUN test will started and after merge reall apply will performed
 ## Settings
