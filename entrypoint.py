@@ -53,11 +53,17 @@ gh_pr_comment = ''
 if event_name == "pull_request":
     gh_pr_comment = get_gh_pr_comment_from_env(gh_full_json)
 if event_name == "push":
-    gh_pr_number = get_gh_pr_number_from_env(gh_full_json)
-    if gh_pr_number:
-        # Use gh_template_url to get protocol, server, repository owner and repository name
+    print('Try to parse merge commit message...')
+    gh_pr_number_mc = get_gh_pr_number_from_env(gh_full_json, '^Merge pull request #([0-9]+) from .*')
+    print('Try to parse squash merge message...')
+    gh_pr_number_sm = get_gh_pr_number_from_env(gh_full_json, '^.+\(#([0-9]+)\)')
+    # Use gh_template_url to get protocol, server, repository owner and repository name
+    if gh_pr_number_mc:
         gh_template_url = gh_full_json["event"]["repository"]["issues_url"]
-        gh_pr_comment = get_gh_pr_comment_by_pr_id(gh_token, gh_template_url, gh_pr_number)
+        gh_pr_comment = get_gh_pr_comment_by_pr_id(gh_token, gh_template_url, gh_pr_number_mc)
+    elif gh_pr_number_sm:
+        gh_template_url = gh_full_json["event"]["repository"]["issues_url"]
+        gh_pr_comment = get_gh_pr_comment_by_pr_id(gh_token, gh_template_url, gh_pr_number_sm)
     else:
         print("Looks like it is not merge pull request, just simple push - EXIT...")
         exit(0)
@@ -185,7 +191,10 @@ print('Check files_list_deleted array - skip...')
 #gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
 
 print('Combine comment for GitHub pool request...')
-gh_comment_body = "<html><body>Previewing update:<br><br>" + gh_comment_body_preview + "<br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
-#gh_comment_body = "<html><body>Previewing update:<br><br><pre><code>" + gh_comment_body_preview + "</code></pre><br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
+if event_name == "pull_request":
+    gh_comment_body = "<html><body>Previewing update:<br><br>" + gh_comment_body_preview + "<br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
+    # gh_comment_body = "<html><body>Previewing update:<br><br><pre><code>" + gh_comment_body_preview + "</code></pre><br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
+if event_name == "push":
+    gh_comment_body = "<html><body>Applying update:<br><br>" + gh_comment_body_preview + "<br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
+    # gh_comment_body = "<html><body>Previewing update:<br><br><pre><code>" + gh_comment_body_preview + "</code></pre><br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
 add_gh_pr_comment(gh_token, comments_url, gh_comment_body)
-
