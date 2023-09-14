@@ -38,8 +38,9 @@ def is_kube_object_type_valid(file_yaml, kind_types):
 
 # Sort kubernetes files
 def get_valid_kube_files(deployment_order_names, files_list_git_changed, type):
-    # type can be OTHER WITHGROUP WITHOUTGROUP DELETED KUBE_VALID
+    # type can be OTHER WITHGROUP WITHOUTGROUP DELETED KUBE_VALID NOTVALID
     # KUBE_VALID - only validate, without check order groups
+    # NOTVALID - validate and add to not valid array
     #print('get_valid_kube_files')
     #print('deployment_order_names:', deployment_order_names)
     #print('files_list_git_changed:', files_list_git_changed)
@@ -49,12 +50,15 @@ def get_valid_kube_files(deployment_order_names, files_list_git_changed, type):
             print('get_valid_kube_files processing: ' + to_str(changed_file_name) + ' type: ' + type)
         if os.path.exists(changed_file_name):
             if is_path_allowed(changed_file_name):
-                if is_extension_allowed(changed_file_name):
+                if is_extension_allowed(changed_file_name, ['.yaml', '.yml']):
                     changed_file_yaml = yaml_load(changed_file_name)
                     if changed_file_yaml == None:
-                        print('try to fix file - replace tabs')
+                        print('trying to fix file - replacing tabs...')
                         replace_text_in_file(changed_file_name, '\t', ' ')
                         changed_file_yaml = yaml_load(changed_file_name)
+                        if type == 'NOTVALID':
+                            print('get_valid_kube_files not valid yaml file - NOTVALID (' + to_str(changed_file_name) + ')')
+                            result_array[0].append(changed_file_name)
                     if changed_file_yaml:
                         if is_kube_object_type_valid(changed_file_yaml, ['Deployment']):
                             if os.getenv('LOG') == 'DEBUG':

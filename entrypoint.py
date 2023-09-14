@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import sys
 import json
 from my_common import to_str
 from my_common import run_shell_command
@@ -28,6 +29,7 @@ from my_github import get_order_list_from_comment
 from my_github import get_order_list_from_file
 from my_yaml import yaml_load
 from my_yaml import get_yaml_path_key
+from my_json import get_valid_json_files
 
 # Set git repository permissions
 print("prepare git repository...")
@@ -139,47 +141,9 @@ if event_name == "push":
 print('first_commit:', first_commit)
 print('last_commit:', last_commit)
 
-print("get git current commits changes...")
-gh_comment_body_preview = ''
-gh_comment_body_details = ''
-# Get All
+print("get git all changed files...")
 files_list_git_changed = get_git_diff_files_list(first_commit, last_commit, 'All', event_name)
-# Get Added
-files_list_git_added = get_git_diff_files_list(first_commit, last_commit, 'Added', event_name)
-if files_list_git_added:
-    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_added)) + ' added<br>'
-for file in files_list_git_added:
-    gh_comment_body_details = gh_comment_body_details + '+ ' + to_str(file) + '<br>'
-# Get Modified
-files_list_git_modified = get_git_diff_files_list(first_commit, last_commit, 'Modified', event_name)
-if files_list_git_modified:
-    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_modified)) + ' modified<br>'
-for file in files_list_git_modified:
-    gh_comment_body_details = gh_comment_body_details + '~ ' + to_str(file) + '<br>'
-# Get Renamed
-files_list_git_renamed = get_git_diff_files_list(first_commit, last_commit, 'Renamed', event_name)
-if files_list_git_renamed:
-    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_renamed)) + ' renamed<br>'
-for file in files_list_git_renamed:
-    gh_comment_body_details = gh_comment_body_details + '~ ' + to_str(file) + '<br>'
-# Get Deleted
-files_list_git_deleted = get_git_diff_files_list(first_commit, last_commit, 'Deleted', event_name)
-if files_list_git_deleted:
-    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_deleted)) + ' deleted<br>'
-for file in files_list_git_deleted:
-    gh_comment_body_details = gh_comment_body_details + '- ' + to_str(file) + '<br>'
-# Compare
-if len(files_list_git_changed) != len(files_list_git_added) + len(files_list_git_modified) + len(files_list_git_renamed) + len(files_list_git_deleted):
-    print("Warning: not accounted git diff files!")
-    not_accounted = len(files_list_git_changed) - len(files_list_git_added) + len(files_list_git_modified) + len(files_list_git_renamed) + len(files_list_git_deleted)
-    gh_comment_body_preview = gh_comment_body_preview + str(not_accounted) + ' UNKNOW<br>'
-    print("len(files_list_git_changed):", len(files_list_git_changed))
-    print("len(files_list_git_added):", len(files_list_git_added))
-    print("len(files_list_git_modified):", len(files_list_git_modified))
-    print("len(files_list_git_renamed):", len(files_list_git_renamed))
-    print("len(files_list_git_deleted):", len(files_list_git_deleted))
-gh_comment_body_details = gh_comment_body_details + '<br><br>Sequence of updating:<br><br>'
-print("parse changed files...")
+print("start parsing changed files...")
 ########################################################################################################################
 # Initialize two dimensional array 'files_list_deployment_order' to append file names to index number                  #
 # founded for deployment-order-group item                                                                              #
@@ -191,36 +155,115 @@ print("parse changed files...")
 files_list_other_types = get_valid_kube_files(deployment_order_names, files_list_git_changed, 'OTHER')
 files_list_deployment_order = get_valid_kube_files(deployment_order_names, files_list_git_changed, 'WITHGROUP')
 files_list_deployment_no_group = get_valid_kube_files(deployment_order_names, files_list_git_changed, 'WITHOUTGROUP')
+files_list_not_valid_yamls = get_valid_kube_files(deployment_order_names, files_list_git_changed, 'NOTVALID')
+files_list_not_valid_jsons = get_valid_json_files(deployment_order_names, files_list_git_changed, 'NOTVALID')
 # get only not founded files, after switch to previous commit will validate them
 files_list_probably_deleted = get_valid_kube_files(deployment_order_names, files_list_git_changed, 'DELETED')
 print('files_list_other_types:', files_list_other_types)
 print('files_list_deployment_order:', files_list_deployment_order)
 print('files_list_deployment_no_group:', files_list_deployment_no_group)
+print('files_list_not_valid:', files_list_not_valid_yamls)
 print('files_list_probably_deleted:', files_list_probably_deleted)
-if os.getenv('LOG') == 'DEBUG':
-    print('main type(deployment_order_numbers)', type(deployment_order_numbers))
-if isinstance(deployment_order_numbers, list):
-    print('Apply to kubernetes...')
-    hosts_name = os.getenv('HOSTS_NAME')
-    hosts_ip = os.getenv('HOSTS_IP')
-    add_string_to_file('/etc/hosts', hosts_ip + ' ' + hosts_name)
-    run_shell_command('cat /etc/hosts | grep ' + hosts_name, 'Output=True')
-    set_up_kube_config()
-    get_kube_nodes()
-    gh_comment_body_part = kube_apply_files_list(['group:other'], files_list_other_types)
-    gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
-    gh_comment_body_part = kube_apply_files_list(deployment_order_numbers, files_list_deployment_order)
-    gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
-    gh_comment_body_part = kube_apply_files_list(['group:no group'], files_list_deployment_no_group)
-    gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
-    print('Check files_list_deleted array - skip...')
-    #get_git_switch_to_commit(last_commit)
-    #files_list_deleted = get_valid_kube_files(deployment_order_names, files_list_probably_deleted[0], 'KUBE_VALID  ')
-    #print('files_list_deleted:', files_list_deleted)
-    #gh_comment_body_part = kube_apply_files_list(['group:deleted'], files_list_deleted)
-    #gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
+#
+print("get git changed files by type of change...")
+files_list_git_added = get_git_diff_files_list(first_commit, last_commit, 'Added', event_name)
+files_list_git_modified = get_git_diff_files_list(first_commit, last_commit, 'Modified', event_name)
+files_list_git_renamed = get_git_diff_files_list(first_commit, last_commit, 'Renamed', event_name)
+files_list_git_deleted = get_git_diff_files_list(first_commit, last_commit, 'Deleted', event_name)
+#
+print("prepare git pool request message...")
+gh_comment_body_preview = ''
+gh_comment_body_details = ''
+# Added files
+if files_list_git_added:
+    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_added)) + ' added<br>'
+for file in files_list_git_added:
+    if file in files_list_not_valid_yamls[0]:
+        gh_comment_body_details = gh_comment_body_details + '+ ' + to_str(file) + ' (NOT VALID YAML)<br>'
+    elif file in files_list_not_valid_jsons[0]:
+        gh_comment_body_details = gh_comment_body_details + '+ ' + to_str(file) + ' (NOT VALID JSON)<br>'
+    else:
+        gh_comment_body_details = gh_comment_body_details + '+ ' + to_str(file) + '<br>'
+# Modified files
+if files_list_git_modified:
+    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_modified)) + ' modified<br>'
+for file in files_list_git_modified:
+    if file in files_list_not_valid_yamls[0]:
+        gh_comment_body_details = gh_comment_body_details + '~ ' + to_str(file) + ' (NOT VALID YAML)<br>'
+    elif file in files_list_not_valid_jsons[0]:
+        gh_comment_body_details = gh_comment_body_details + '+ ' + to_str(file) + ' (NOT VALID JSON)<br>'
+    else:
+        gh_comment_body_details = gh_comment_body_details + '~ ' + to_str(file) + '<br>'
+# Renamed files
+if files_list_git_renamed:
+    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_renamed)) + ' renamed<br>'
+for file in files_list_git_renamed:
+    if file in files_list_not_valid_yamls[0]:
+        gh_comment_body_details = gh_comment_body_details + '~ ' + to_str(file) + ' (NOT VALID YAML)<br>'
+    elif file in files_list_not_valid_jsons[0]:
+        gh_comment_body_details = gh_comment_body_details + '+ ' + to_str(file) + ' (NOT VALID JSON)<br>'
+    else:
+        gh_comment_body_details = gh_comment_body_details + '~ ' + to_str(file) + '<br>'
+# Deleted files
+if files_list_git_deleted:
+    gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_git_deleted)) + ' deleted<br>'
+for file in files_list_git_deleted:
+    if file in files_list_not_valid_yamls[0]:
+        gh_comment_body_details = gh_comment_body_details + '- ' + to_str(file) + ' (NOT VALID YAML)<br>'
+    elif file in files_list_not_valid_jsons[0]:
+        gh_comment_body_details = gh_comment_body_details + '+ ' + to_str(file) + ' (NOT VALID JSON)<br>'
+    else:
+        gh_comment_body_details = gh_comment_body_details + '- ' + to_str(file) + '<br>'
+# Compare all with changed by type
+if len(files_list_git_changed) != len(files_list_git_added) + len(files_list_git_modified) + len(files_list_git_renamed) + len(files_list_git_deleted):
+    print("Warning: not accounted git diff files!")
+    not_accounted = len(files_list_git_changed) - len(files_list_git_added) + len(files_list_git_modified) + len(files_list_git_renamed) + len(files_list_git_deleted)
+    gh_comment_body_preview = gh_comment_body_preview + str(not_accounted) + ' UNKNOWN TYPE OF CHANGE<br>'
+    print("len(files_list_git_changed):", len(files_list_git_changed))
+    print("len(files_list_git_added):", len(files_list_git_added))
+    print("len(files_list_git_modified):", len(files_list_git_modified))
+    print("len(files_list_git_renamed):", len(files_list_git_renamed))
+    print("len(files_list_git_deleted):", len(files_list_git_deleted))
+# if founded not valid files
+if files_list_not_valid_yamls[0] or files_list_not_valid_jsons[0]:
+    gh_comment_body_preview = gh_comment_body_preview + '<br>'
+    if files_list_not_valid_yamls[0] and files_list_not_valid_jsons[0]:
+        gh_comment_body_preview = gh_comment_body_preview + str(len(files_list_not_valid_yamls[0]) + len(files_list_not_valid_jsons[0])) + ' NOT VALID YAML AND JSON FILES FOUNDED - WILL STOP UPDATE!<br>'
+    else:
+        if files_list_not_valid_yamls[0]:
+            gh_comment_body_preview = gh_comment_body_preview + str(
+                len(files_list_not_valid_yamls[0])) + ' NOT VALID YAML FILES FOUNDED - WILL STOP UPDATE!<br>'
+        if files_list_not_valid_jsons[0]:
+            gh_comment_body_preview = gh_comment_body_preview + str(
+                len(files_list_not_valid_jsons[0])) + ' NOT VALID JSON FILES FOUNDED - WILL STOP UPDATE!<br>'
+    gh_comment_body_details = gh_comment_body_details + '<br><br>Update is stopped!<br><br>'
 else:
-    print('Skip applying...')
+    gh_comment_body_details = gh_comment_body_details + '<br><br>Sequence of updating:<br><br>'
+    if os.getenv('LOG') == 'DEBUG':
+        print('main type(deployment_order_numbers)', type(deployment_order_numbers))
+
+    if isinstance(deployment_order_numbers, list):
+        print('Apply to kubernetes...')
+        hosts_name = os.getenv('HOSTS_NAME')
+        hosts_ip = os.getenv('HOSTS_IP')
+        add_string_to_file('/etc/hosts', hosts_ip + ' ' + hosts_name)
+        run_shell_command('cat /etc/hosts | grep ' + hosts_name, 'Output=True')
+        set_up_kube_config()
+        get_kube_nodes()
+        gh_comment_body_part = kube_apply_files_list(['group:other'], files_list_other_types)
+        gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
+        gh_comment_body_part = kube_apply_files_list(deployment_order_numbers, files_list_deployment_order)
+        gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
+        gh_comment_body_part = kube_apply_files_list(['group:no group'], files_list_deployment_no_group)
+        gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
+        print('Check files_list_deleted array - skip...')
+        #get_git_switch_to_commit(last_commit)
+        #files_list_deleted = get_valid_kube_files(deployment_order_names, files_list_probably_deleted[0], 'KUBE_VALID  ')
+        #print('files_list_deleted:', files_list_deleted)
+        #gh_comment_body_part = kube_apply_files_list(['group:deleted'], files_list_deleted)
+        #gh_comment_body_details = gh_comment_body_details + gh_comment_body_part
+    else:
+        print('Skip applying due to empty order...')
 
 print('Combine comment for GitHub pool request...')
 if event_name == "pull_request":
@@ -229,4 +272,8 @@ if event_name == "pull_request":
 if event_name == "push":
     gh_comment_body = "<html><body>Applying update:<br><br>" + gh_comment_body_preview + "<br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
     # gh_comment_body = "<html><body>Previewing update:<br><br><pre><code>" + gh_comment_body_preview + "</code></pre><br><details><summary>Details</summary>Previewing update:<br><br>" + gh_comment_body_details + "</details></body></html>"
+# Push comment message to pool request
 add_gh_pr_comment(gh_token, comments_url, gh_comment_body)
+# Fail pool request action job if we have not valid files
+if files_list_not_valid_yamls[0] or files_list_not_valid_jsons[0]:
+    sys.exit("Fail pool request action job due to have not valid files")
