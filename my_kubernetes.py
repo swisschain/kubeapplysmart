@@ -87,7 +87,7 @@ def get_valid_kube_files(deployment_order_names, files_list_git_changed, type):
                                 if type == 'WITHOUTGROUP':
                                     print('get_valid_kube_files deployment - WITHOUTGROUP (' + to_str(changed_file_name) + ')')
                                     result_array[0].append(changed_file_name)
-                        elif is_kube_object_type_valid(changed_file_yaml, ['ConfigMap', 'Service', 'Secret']):
+                        elif is_kube_object_type_valid(changed_file_yaml, ['ConfigMap', 'Service', 'Secret', 'StorageClass', 'PersistentVolume', 'PersistentVolumeClaim']):
                             if type == 'OTHER':
                                 print('get_valid_kube_files not deployment - OTHER (' + to_str(changed_file_name) + ')')
                                 result_array[0].append(changed_file_name)
